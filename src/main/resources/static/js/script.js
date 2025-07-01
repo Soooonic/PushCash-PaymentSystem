@@ -15,12 +15,18 @@ async function showForm(serviceType) {
     document.getElementById("payServiceIcon").src = iconMap[serviceType] || "";
     document.getElementById("payServiceIcon").style.display = "inline";
 
+    // Show relevant fields
     document.getElementById("mobileField").style.display = serviceType === "mobile" ? "block" : "none";
-    document.getElementById("landlineField").style.display = (serviceType === "landline" || serviceType === "internet") ? "block" : "none";
+    document.getElementById("landlineField").style.display =
+        (serviceType === "landline" || serviceType === "internet") ? "block" : "none";
 
     const providerSelect = document.getElementById("providerId");
+    const amountInput = document.getElementById("amount");
     providerSelect.innerHTML = '<option value="">-- Select Provider --</option>';
-    document.getElementById("amount").value = "";
+    amountInput.value = "";
+
+    // Allow manual amount entry for mobile or donation
+    amountInput.readOnly = !(serviceType === "mobile" || serviceType === "donation");
 
     try {
         const response = await fetch(`/api/providers?type=${serviceType}`);
@@ -45,14 +51,15 @@ function updateAmount() {
 
     if (!selectedOption || selectedOption.value === "") {
         amountInput.value = "";
-        amountInput.readOnly = true;
+        amountInput.readOnly = !(selectedServiceType === "mobile" || selectedServiceType === "donation");
         return;
     }
 
-    if (selectedServiceType === "donation") {
-        amountInput.value = "";
+    if (selectedServiceType === "mobile" || selectedServiceType === "donation") {
+        // Leave it editable, don’t override
         amountInput.readOnly = false;
     } else {
+        // Set fixed price
         amountInput.value = selectedOption.dataset.price || "";
         amountInput.readOnly = true;
     }
@@ -77,22 +84,29 @@ function validateForm() {
 }
 
 function loadPayPalSDK() {
-    const clientId = document.getElementById("clientId").value;
-    const amount = document.getElementById("smartAmount").value;
+    const clientId = document.getElementById("clientId").value.trim();
+    const amount = document.getElementById("smartAmount").value.trim();
 
     if (!clientId || !amount || parseFloat(amount) <= 0) {
         alert("Please enter a valid Receiver Client ID and amount.");
         return;
     }
 
+    // Remove old script and PayPal button
     const oldScript = document.getElementById("paypal-sdk");
     if (oldScript) oldScript.remove();
     document.getElementById("paypal-button-container").innerHTML = "";
 
+    // Create new PayPal SDK script
     const script = document.createElement("script");
     script.src = `https://www.paypal.com/sdk/js?client-id=${clientId}&currency=USD`;
     script.id = "paypal-sdk";
+
     script.onload = renderPayPalButtons;
+    script.onerror = function () {
+        alert("The Client ID may be invalid.");
+    };
+
     document.head.appendChild(script);
 }
 
